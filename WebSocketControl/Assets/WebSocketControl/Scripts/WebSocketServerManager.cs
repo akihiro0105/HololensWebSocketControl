@@ -31,6 +31,7 @@ namespace WebSocketConteol
 #if UNITY_UWP
 #elif UNITY_EDITOR || UNITY_STANDALONE
             server.Stop();
+            server = null;
 #endif
         }
     }

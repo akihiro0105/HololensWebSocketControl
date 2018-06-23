@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 #if UNITY_UWP
+using Windows.Networking.Sockets;
+using System.Threading.Tasks;
+using Windows.Storage.Streams;
 #elif UNITY_EDITOR || UNITY_STANDALONE
 using WebSocketSharp;
 #endif
@@ -24,6 +27,8 @@ namespace WebSocketConteol
         public WebSocketLogEventHandler WebSocketCloseEvent;
 
 #if UNITY_UWP
+        private MessageWebSocket ws;
+        private Task task = null;
 #elif UNITY_EDITOR || UNITY_STANDALONE
         private WebSocket ws;
 #endif
@@ -40,6 +45,21 @@ namespace WebSocketConteol
         public void CoonetServer(string url)
         {
 #if UNITY_UWP
+            task = Task.Run(async () =>
+            {
+                ws = new MessageWebSocket();
+                ws.Control.MessageType = SocketMessageType.Binary;
+                ws.MessageReceived += MessageReceived;
+                ws.Closed += (sender, e) => { if (WebSocketCloseEvent != null) WebSocketCloseEvent("Close"); };
+                try
+                {
+                    await ws.ConnectAsync(new Uri(url));
+                }
+                catch (Exception e)
+                {
+                    if (WebSocketErrorEvent != null) WebSocketErrorEvent(e.ToString());
+                }
+            });
 #elif UNITY_EDITOR || UNITY_STANDALONE
             ws = new WebSocket(url);
             ws.OnMessage += OnMessage;
@@ -50,12 +70,17 @@ namespace WebSocketConteol
 #endif
         }
 
+
         public void DisconnectServer()
         {
 #if UNITY_UWP
+            ws.MessageReceived -= MessageReceived;
+            ws.Dispose();
+            ws = null;
 #elif UNITY_EDITOR || UNITY_STANDALONE
             ws.OnMessage -= OnMessage;
             ws.Close();
+            ws = null;
 #endif
         }
 
@@ -68,6 +93,19 @@ namespace WebSocketConteol
         public bool SendMessage(byte[] data)
         {
 #if UNITY_UWP
+            if (ws != null && task.IsCompleted==true)
+            {
+                task = Task.Run(async () =>
+                {
+                    using (var datawriter=new DataWriter(ws.OutputStream))
+                    {
+                        datawriter.WriteBytes(data);
+                        await datawriter.StoreAsync();
+                        datawriter.DetachStream();
+                    }
+                });
+                return true;
+            }
 #elif UNITY_EDITOR || UNITY_STANDALONE
             if (ws != null)
             {
@@ -79,6 +117,25 @@ namespace WebSocketConteol
         }
 
 #if UNITY_UWP
+        private void MessageReceived(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
+        {
+            try
+            {
+                using (DataReader datareader = args.GetDataReader())
+                {
+                    var buffer = datareader.UnconsumedBufferLength;
+                    byte[] buf = new byte[buffer];
+                    datareader.ReadBytes(buf);
+                    if (WebSocketByteEvent != null) WebSocketByteEvent(buf);
+                    string data = Encoding.UTF8.GetString(buf);
+                    if (WebSocketMessageEvent != null) WebSocketMessageEvent(data);
+                }
+            }
+            catch (Exception e)
+            {
+                if (WebSocketErrorEvent != null) WebSocketErrorEvent(e.ToString());
+            }
+        }
 #elif UNITY_EDITOR || UNITY_STANDALONE
         private void OnMessage(object sender, MessageEventArgs e)
         {
