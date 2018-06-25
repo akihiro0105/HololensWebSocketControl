@@ -42,13 +42,14 @@ namespace WebSocketConteol
             CoonetServer(url);
         }
 
-        public void CoonetServer(string url)
+        public void CoonetServer(string url,bool stringflag=false)
         {
 #if UNITY_UWP
             task = Task.Run(async () =>
             {
                 ws = new MessageWebSocket();
                 ws.Control.MessageType = SocketMessageType.Binary;
+                if (stringflag == true) ws.Control.MessageType = SocketMessageType.Utf8;
                 ws.MessageReceived += MessageReceived;
                 ws.Closed += (sender, e) => { if (WebSocketCloseEvent != null) WebSocketCloseEvent("Close"); };
                 try
@@ -86,8 +87,28 @@ namespace WebSocketConteol
 
         public bool SendMessage(string data)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(data);
-            return SendMessage(bytes);
+#if UNITY_UWP
+            if (ws != null && task.IsCompleted==true)
+            {
+                task = Task.Run(async () =>
+                {
+                    using (var datawriter=new DataWriter(ws.OutputStream))
+                    {
+                        datawriter.WriteString(data);
+                        await datawriter.StoreAsync();
+                        datawriter.DetachStream();
+                    }
+                });
+                return true;
+            }
+#elif UNITY_EDITOR || UNITY_STANDALONE
+            if (ws != null)
+            {
+                ws.Send(data);
+                return true;
+            }
+#endif
+            return false;
         }
 
         public bool SendMessage(byte[] data)
@@ -127,7 +148,9 @@ namespace WebSocketConteol
                     byte[] buf = new byte[buffer];
                     datareader.ReadBytes(buf);
                     if (WebSocketByteEvent != null) WebSocketByteEvent(buf);
-                    string data = Encoding.UTF8.GetString(buf);
+
+                    datareader.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
+                    string data = datareader.ReadString(datareader.UnconsumedBufferLength);
                     if (WebSocketMessageEvent != null) WebSocketMessageEvent(data);
                 }
             }
@@ -140,8 +163,7 @@ namespace WebSocketConteol
         private void OnMessage(object sender, MessageEventArgs e)
         {
             if (WebSocketByteEvent != null) WebSocketByteEvent(e.RawData);
-            string data = Encoding.UTF8.GetString(e.RawData);
-            if (WebSocketMessageEvent != null) WebSocketMessageEvent(data);
+            if (WebSocketMessageEvent != null) WebSocketMessageEvent(e.Data);
         }
 #endif
     }
