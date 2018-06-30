@@ -42,6 +42,7 @@ namespace WebSocketConteol
     {
         protected override void OnMessage(MessageEventArgs e)
         {
+            Debug.Log(e.IsText);
             if (e.IsText == true)
             {
                 Sessions.Broadcast(e.Data);

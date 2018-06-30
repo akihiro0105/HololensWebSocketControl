@@ -10,7 +10,7 @@ public class WebSocketControlSample : MonoBehaviour {
     // Use this for initialization
     void Start () {
         server = new WebSocketServerManager(3000);
-        client = new WebSocketClientManager("ws://192.168.1.5:3000/");
+        client = new WebSocketClientManager("ws://192.168.1.5:3000/", WebSocketClientManager.DataType.Text);
         client.WebSocketMessageEvent += (ms) =>
         {
             Debug.Log(ms);
