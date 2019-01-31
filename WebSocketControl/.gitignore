@@ -5,6 +5,8 @@
 [Bb]uilds/
 Assets/AssetStoreTools*
 /bin/
+/Assets/HoloLensModule/
+/Assets/HoloLensModule.meta
 
 # Visual Studio cache directory
 .vs/
