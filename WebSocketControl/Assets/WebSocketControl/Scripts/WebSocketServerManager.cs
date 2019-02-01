@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 #if UNITY_UWP
 #elif UNITY_EDITOR || UNITY_STANDALONE
 using WebSocketSharp;
